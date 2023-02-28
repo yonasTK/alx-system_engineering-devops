@@ -1,19 +1,35 @@
 #!/usr/bin/python3
-""" Recursive function that queries the Reddit API
-    parses the title of all hot articles, and prints a sorted count"""
+"""
+Show number of occurrences of keywords in hot post titles (case-insensitive)
+"""
+import re
 import requests
-import sys
-after = None
-count_dic = []
+
+API = 'https://www.reddit.com/r/{}/hot.json'
 
 
-def count_words(subreddit, word_list):
-    """parses the title of all hot articles, and prints a sorted count of given
-    keywords (case-insensitive, delimited by spaces) """
-    global after
-    global count_dic
-    headers = {'User-Agent': 'xica369'}
-    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    parameters = {'after': after}
-    response = requests.get(url, headers=headers, allow_redirects=False,
-                            params=parameters)
+def count_words(subreddit, wordlist, nums=None, after=None):
+    """
+    Query reddit for hot posts and print total occurrences of each keyword
+    """
+    r = requests.get(
+        API.format(subreddit),
+        headers={'User-Agent': 'Mozilla/5.0'},
+        params={'after': after, 'limit': 100},
+        allow_redirects=False,
+    )
+    if r.status_code == 200:
+        nums = nums or dict.fromkeys(wordlist, 0)
+        data = r.json()['data']
+        page = [word for post in data['children']
+                for word in post['data']['title'].split()]
+        for key in wordlist:
+            for word in page:
+                if key.casefold() == word.casefold():
+                    nums[key] += 1
+        if data['after'] is None:
+            keys = sorted(filter(nums.get, nums), key=lambda k: (-nums[k], k))
+            for key in keys:
+                print('{}: {}'.format(key, nums[key]))
+        else:
+            count_words(subreddit, wordlist, nums, data['after'])
